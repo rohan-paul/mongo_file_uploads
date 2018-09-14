@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require ('crypto') // this is node's built-in crypto module
 const mongoose = require('mongoose');
 const multer = require('multer');
+const port = 5080;
 
 /* Why multer-gridfs-storage - https://github.com/devconcept/multer-gridfs-storage/wiki/Using-generator-functions - GridFS storage engine for Multer to store uploaded files directly to MongoDb
 */
@@ -40,7 +41,13 @@ const conn = mongoose.createConnection(mongoURI)
 // Init gridfs-stream
 let gfs;
 
+// Streaming files to and from MongoDB
 // https://github.com/aheckmann/gridfs-stream#using-with-mongoose
+conn.once('open', () => {
+    // Initialize the gfs
+    gfs = Grid(conn.db, mongoose.mongo);
+    gfs.collection('uploads');
+})
 
 
 /* Create a storage object with a given configuration
@@ -67,9 +74,43 @@ const storage = new GridFsStorage({
         })
     }
 })
-// Set multer storage engine to the newly created object - https://github.com/devconcept/multer-gridfs-storage
-// The below code effectively defines where I want to save my uploaded files. When an image is received by the route, it will be automatically saved by multer to this directory.
+
+/* 1> crypto.randomBytes - https://nodejs.org/api/crypto.html#crypto_crypto_randombytes_size_callback -
+
+Generates cryptographically strong pseudo-random data. The size argument is a number indicating the number of bytes to generate. So basically the crypto.randomBytes() is used to generate random string.
+
+2> buf.toString - https://nodejs.org/api/buffer.html#buffer_buf_tostring_encoding_start_end
+
+Decodes buf to a string according to the specified character encoding in encoding. */
+
+
+/* Now Set multer storage engine to the newly created object - https://github.com/devconcept/multer-gridfs-storage
+The below code effectively defines where I want to save my uploaded files. When an image is received by the route, it will be automatically saved by multer to this directory. */
 const upload = multer({ storage });
+
+/* @route GET /
+@desc Loads form
+Below codes to first access file metadata and check if it exists and is an image, and then render the index file.
+gfs.files.find() - All file meta-data (file name, upload date, contentType, etc) are stored in a special mongodb collection separate from the actual file data. This collection can be queried directly: */
+app.get('/', (req, res) => {
+    gfs.files.find().toArray((err, files) => {
+        if (!files || files.length === 0) {
+            res.render('index', { files: false });
+        } else {
+            files.map(file => {
+                if (
+                    file.contentType === 'image/jpeg' ||
+                    file.contentType === 'image/png'
+                ) {
+                    file.isImage = true;
+                } else {
+                    file.isImage = false;
+                }
+            })
+            res.render('index', { files: files });
+        }
+    })
+})
 
 
 /* @route POST /upload
@@ -81,6 +122,76 @@ https://github.com/expressjs/multer#usage - Multer adds a body object and a file
 
 https://github.com/expressjs/multer#singlefieldname - .single(fieldname) - Accept a single file with the name fieldname. The single file will be stored in req.file.
 */
+
 app.post('/upload', upload.single('file'), (req, res) => {
     res.redirect('/')
 })
+
+// @route GET /files
+// @desc  Display all files in JSON - same logic as above for rendering the index.ejs file
+app.get('/files', (req, res) => {
+    gfs.files.find().toArray((err, files) => {
+        if (!files || files.length === 0 ) {
+            return res.status(404).json({
+                err: 'No files exists'
+            });
+        }
+
+        // Else files exists, hence return it
+        return res.json(files)
+    })
+})
+
+// @route GET /files/:filename
+// @desc  Display single file object
+app.get('/files/:filename', (req, res) => {
+    gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
+        if (!file || file.length === 0 ) {
+            return res.status(404).json({
+                err: 'No file exists'
+            });
+        }
+        // Else the files exists, hence return it
+        return res.json(file)
+    })
+})
+
+// @route GET /image/:filename
+// @desc Display Image
+app.get('/images/:filename', (req, res) => {
+    gfs.files.findOnde({ filename: req.params.filename }, (err, file) => {
+        if (!file || file.length === 0) {
+            return res.status(404).json({
+                err: 'No file exists'
+            })
+        }
+
+        // check for image and if true, then I have to create a readStream to read that file
+        if (file.contentType === 'image/jpeg' || file.contentType === 'image/png') {
+            const readStream = gfs.createReadStream(file.filename);
+            readStream.pipe(res)
+        } else {
+            res.status(404).json({
+                err: 'File is not a jpeg or png file type'
+            });
+        }
+    });
+})
+
+
+// In the pipe function above, I am reading from the readStream once it becomes available, and writing it to a destination writable stream. Note - in a Node.js based HTTP server, request is a readable stream and response is a writable stream.
+
+// @route DELETE /files/:id
+// @desc Delete file
+app.delete('/files/:id', (req, res) => {
+    gfs.remove({ _id: req.params.id, root: 'uploads' }, (err, gridStore) => {
+        if (err) {
+            return res.status(404).json({
+                err: err
+            })
+        }
+        res.redirect('/')
+    })
+})
+
+app.listen(port, () => console.log(`The server started on port ${port}`))

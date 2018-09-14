@@ -1,4 +1,4 @@
-An app to only implement a functionality to upload files to mongodb database in a node app. I am using mLab for mongodb and multer and multer-gridfs-storage (the GridFS storage engine for Multer to store uploaded files directly to MongoDb) for file uploading.
+An app to only implement a functionality to upload image files ( only .jpeg or .png are accepted) to mongodb database in a node app. I am using mLab for mongodb and multer and multer-gridfs-storage (the GridFS storage engine for Multer to store uploaded files directly to MongoDb) for file uploading.
 
 App.js is our server-side code and the client-side of the application ``( ./view/index.ejs )`` would make request to the API in ``app.js`` to get the data from the database (hosted in mLab).
 

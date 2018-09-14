@@ -29,6 +29,14 @@
                     </div>
                     <input type="submit" class="btn btn-success btn-block">
                 </form>
+                <hr>
+                <% if(files) { %>
+                    files.forEach(file => {
+                        if (file.isImage) {
+                            <img src="image/<%= file.filename %>" alt="" >
+                        }
+                    })
+                }
             </div>
         </div>
     </div>
@@ -48,5 +56,4 @@ And The <input type="file"> defines a file-select field and a "Browse" button fo
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
         crossorigin="anonymous"></script>
 </body>
-
 </html>
