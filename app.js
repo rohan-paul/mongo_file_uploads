@@ -4,7 +4,9 @@ const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const multer = require('multer');
-const port = 5080;
+
+// Given I will deploy it in Heroku, I shall use process.env.port but locally my app will run on port 5000
+const port = process.env.PORT || 5080;
 
 /* Why multer-gridfs-storage - https://github.com/devconcept/multer-gridfs-storage/wiki/Using-generator-functions - GridFS storage engine for Multer to store uploaded files directly to MongoDb
 */
