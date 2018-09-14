@@ -1,18 +1,18 @@
 const express = require('express');
-const bodyParser = require('body-parser')
+const bodyParser = require('body-parser');
 const path = require('path');
-const crypto = require ('crypto') // this is node's built-in crypto module
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const port = 5080;
 
 /* Why multer-gridfs-storage - https://github.com/devconcept/multer-gridfs-storage/wiki/Using-generator-functions - GridFS storage engine for Multer to store uploaded files directly to MongoDb
 */
-const GridFsStorage = require('multer-gridfs-storage')
+const GridFsStorage = require('multer-gridfs-storage');
 
 /* gridfs-stream is required for streaming files to and from MongoDB GridFS.
 The gridfs-stream module exports a constructor that accepts an open mongodb-native db and the mongodb-native driver you are using. The db must already be opened before calling createWriteStream or createReadStream. */
-const Grid = require('gridfs-stream')
+const Grid = require('gridfs-stream');
 
 /* methodOveerride - Lets you use HTTP verbs such as PUT or DELETE in places where the client doesn't support it.
 
@@ -23,20 +23,20 @@ A workaround for this is to tunnel other methods through POST by using a hidden 
 
 However, GET, POST, PUT and DELETE are supported by the implementations of XMLHttpRequest (i.e. AJAX calls) in all the major web browsers (IE, Firefox, Safari, Chrome, Opera)..
 */
-const methodOverride = require('method-override')
+const methodOverride = require('method-override');
 
 const app = express()
 
 // Middleware
 app.use(bodyParser.json());
 app.use(methodOverride('_method'));
-app.set('view engine', 'ejs')
+app.set('view engine', 'ejs');
 
 // Mongo URI
-const mongoURI = 'mongodb://root:abc123@ds153552.mlab.com:53552/mongo-node-file-upload-testing-app'
+const mongoURI = 'mongodb://root:abc123@ds153552.mlab.com:53552/mongo-node-file-upload-testing-app';
 
 // Create mongo connection
-const conn = mongoose.createConnection(mongoURI)
+const conn = mongoose.createConnection(mongoURI);
 
 // Init gridfs-stream
 let gfs;
@@ -44,10 +44,10 @@ let gfs;
 // Streaming files to and from MongoDB
 // https://github.com/aheckmann/gridfs-stream#using-with-mongoose
 conn.once('open', () => {
-    // Initialize the gfs
+    // Init stream
     gfs = Grid(conn.db, mongoose.mongo);
     gfs.collection('uploads');
-})
+  });
 
 
 /* Create a storage object with a given configuration
@@ -67,7 +67,7 @@ const storage = new GridFsStorage({
                 const filename = buf.toString('hex') + path.extname(file.originalname)
                 const fileInfo = {
                     filename: filename,
-                    bucketName: 'upload'
+                    bucketName: 'uploads'
                 }
                 resolve(fileInfo)
             })
@@ -94,23 +94,25 @@ Below codes to first access file metadata and check if it exists and is an image
 gfs.files.find() - All file meta-data (file name, upload date, contentType, etc) are stored in a special mongodb collection separate from the actual file data. This collection can be queried directly: */
 app.get('/', (req, res) => {
     gfs.files.find().toArray((err, files) => {
-        if (!files || files.length === 0) {
-            res.render('index', { files: false });
-        } else {
-            files.map(file => {
-                if (
-                    file.contentType === 'image/jpeg' ||
-                    file.contentType === 'image/png'
-                ) {
-                    file.isImage = true;
-                } else {
-                    file.isImage = false;
-                }
-            })
-            res.render('index', { files: files });
-        }
-    })
-})
+      // Check if files
+      if (!files || files.length === 0) {
+        res.render('index', { files: false });
+      } else {
+        files.map(file => {
+          if (
+            file.contentType === 'image/jpeg' ||
+            file.contentType === 'image/png'
+          ) {
+            file.isImage = true;
+          } else {
+            file.isImage = false;
+          }
+        });
+        res.render('index', { files: files });
+      }
+    });
+  });
+
 
 
 /* @route POST /upload
@@ -158,8 +160,8 @@ app.get('/files/:filename', (req, res) => {
 
 // @route GET /image/:filename
 // @desc Display Image
-app.get('/images/:filename', (req, res) => {
-    gfs.files.findOnde({ filename: req.params.filename }, (err, file) => {
+app.get('/image/:filename', (req, res) => {
+    gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
         if (!file || file.length === 0) {
             return res.status(404).json({
                 err: 'No file exists'
